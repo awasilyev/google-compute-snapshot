@@ -61,16 +61,7 @@ setScriptOptions()
 
 getDeviceName()
 {
-    local vm_name="$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/name" -H "Metadata-Flavor: Google")"
-    local device_name="$(gcloud compute disks list ${vm_name} --uri)"
-
-    # local device_name="$(gcloud compute disks list --uri)"
-
-    # strip device name out of response
-    echo -e "${device_name##*/}"
-
-    # Previous Method of getting device-name from MetaData
-    #echo -e "$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/disks/0/device-name" -H "Metadata-Flavor: Google")"
+    echo -e "$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/disks/$1/device-name" -H "Metadata-Flavor: Google")"
 }
 
 
@@ -96,6 +87,10 @@ getInstanceZone()
     echo -e "${instance_zone##*/}"
 }
 
+getNumberOfDisks()
+{
+    echo -e $(mount|cut -d' ' -f1|grep /dev/sd|sort|uniq|wc -l) 
+}
 
 #
 # RETURNS SNAPSHOT NAME
@@ -248,13 +243,13 @@ logTime()
 createSnapshotWrapper()
 {
     # log time
-    logTime "Start of createSnapshotWrapper"
+    logTime "Start of createSnapshotWrapper for disk $1"
 
     # get date time
     DATE_TIME="$(date "+%s")"
 
     # get the device name
-    DEVICE_NAME=$(getDeviceName)
+    DEVICE_NAME=$(getDeviceName $1)
 
     # get the device id
     DEVICE_ID=$(getDeviceId)
@@ -312,11 +307,12 @@ logTime "Start of Script"
 # set options from script input / default value
 setScriptOptions "$@"
 
-# create snapshot
-createSnapshotWrapper
-
+for f in $(seq $(getNumberOfDisks)); do
+# create snapshot 
+createSnapshotWrapper $(($f - 1))
 # delete snapshots older than 'x' days
 deleteSnapshotsWrapper
+done
 
 # log time
 logTime "End of Script"
